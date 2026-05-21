@@ -1,0 +1,25 @@
+{
+  "name": "api-formacioncontinua",
+  "version": "1.0.0",
+  "description": "Api para sistema de formación continua",
+  "license": "ISC",
+  "author": "Guillermo Bonilla",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
+    "mysql2": "^3.22.3",
+    "nodemailer": "^8.0.7",
+    "nodemon": "^3.1.14"
+  }
+}

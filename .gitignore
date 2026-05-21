@@ -1,0 +1,43 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+*.out
+*.pid
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Optional: ignore build outputs if you transpile (e.g., with TypeScript or Babel)
+dist/
+build/
+
+# Optional: coverage from testing
+coverage/
+
+# Optional: editor config files
+.vscode/
+.idea/
+*.swp
+
+# Optional: pm2 log files
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Optional: if you're using Docker
+docker-compose.override.yml
+.env.docker
