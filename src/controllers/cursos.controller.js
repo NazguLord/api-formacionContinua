@@ -1,5 +1,11 @@
+import {
+  guardarCursosNeolms,
+  obtenerCategoriasCursosLocales,
+  obtenerCursosLocales,
+} from '../db/cursos.queries.js';
+
 const NEOLMS_CLASSES_URL =
-  process.env.NEOLMS_CLASSES_URL || 'https://unicah.neolms.com/api/v3/classes?$limit=100&';
+  process.env.NEOLMS_CLASSES_URL || 'https://unicah.neolms.com/api/v3/classes';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_PAGINAS_CACHE = 200;
@@ -103,25 +109,7 @@ const paginarCursos = (cursos, { page, limit }) => {
 
 export const obtenerCategoriasCursos = async (req, res) => {
   try {
-    if (!validarApiKeyCursos()) {
-      return res.status(500).json({
-        message: 'No se ha configurado la API key de cursos',
-      });
-    }
-
-    const cursos = await obtenerTodosCursos();
-    const categoriasMap = new Map();
-
-    cursos.forEach((curso) => {
-      obtenerCategoriasCurso(curso).forEach((categoria) => {
-        const nombre = String(categoria || 'Sin categoria').trim() || 'Sin categoria';
-        categoriasMap.set(nombre, (categoriasMap.get(nombre) || 0) + 1);
-      });
-    });
-
-    const categorias = [...categoriasMap.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    const categorias = await obtenerCategoriasCursosLocales();
 
     return res.status(200).json({
       data: categorias,
@@ -138,52 +126,50 @@ export const obtenerCategoriasCursos = async (req, res) => {
 
 export const obtenerCursos = async (req, res) => {
   try {
+    const page = normalizarEntero(req.query?.page, 1, { min: 1, max: 10000 });
+    const limit = normalizarEntero(req.query?.limit, 10, { min: 1, max: 50 });
+    const category = String(req.query?.category || '').trim();
+    const search = String(req.query?.search || req.query?.q || '').trim();
+    const resultado = await obtenerCursosLocales({ page, limit, category, search });
+
+    return res.status(200).json({
+      data: resultado.data,
+      pagination: resultado.pagination,
+    });
+  } catch (error) {
+    console.error('Error al obtener cursos:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener cursos',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const sincronizarCursosNeolms = async (req, res) => {
+  try {
     if (!validarApiKeyCursos()) {
       return res.status(500).json({
         message: 'No se ha configurado la API key de cursos',
       });
     }
 
-    const page = normalizarEntero(req.query?.page, 1, { min: 1, max: 10000 });
-    const limit = normalizarEntero(req.query?.limit, 10, { min: 1, max: 50 });
-    const category = String(req.query?.category || '').trim();
-    const offset = (page - 1) * limit;
+    const cursos = await obtenerTodosCursos();
+    const resultado = await guardarCursosNeolms(cursos);
 
-    if (category) {
-      const todosCursos = await obtenerTodosCursos();
-      const cursosFiltrados = filtrarCursosPorCategoria(todosCursos, category);
-      const cursosPagina = paginarCursos(cursosFiltrados, { page, limit });
-
-      return res.status(200).json({
-        data: cursosPagina,
-        pagination: {
-          page,
-          limit,
-          count: cursosPagina.length,
-          total: cursosFiltrados.length,
-          hasNextPage: page * limit < cursosFiltrados.length,
-          hasPreviousPage: page > 1,
-        },
-      });
-    }
-
-    const cursos = await consultarCursosCypher({ limit, offset });
+    cursosCache = {
+      data: cursos,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    };
 
     return res.status(200).json({
-      data: cursos,
-      pagination: {
-        page,
-        limit,
-        count: cursos.length,
-        total: null,
-        hasNextPage: cursos.length === limit,
-        hasPreviousPage: page > 1,
-      },
+      message: 'Cursos sincronizados correctamente',
+      totalNeolms: cursos.length,
+      guardados: resultado.guardados,
     });
   } catch (error) {
-    console.error('Error al obtener cursos:', error);
+    console.error('Error al sincronizar cursos desde NEOLMS:', error);
     return res.status(error.status || 500).json({
-      message: error.message || 'Error interno al obtener cursos',
+      message: error.message || 'Error interno al sincronizar cursos desde NEOLMS',
       detail: error.detail || null,
     });
   }

@@ -1,0 +1,9 @@
+services:
+  api-formacioncontinua:
+    build: .
+    container_name: api-formacioncontinua
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    restart: always
