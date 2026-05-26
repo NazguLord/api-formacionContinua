@@ -264,6 +264,40 @@ export const guardarCursosNeolms = async (cursos) => {
   }
 };
 
+export const guardarCursoNeolms = async (curso) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const cursoId = await upsertCurso(connection, curso);
+    const categorias = obtenerCategoriasCurso(curso);
+    await sincronizarCategoriasCurso(connection, cursoId, categorias);
+
+    await connection.commit();
+    return { cursoId };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+export const obtenerCursoLocalPorId = async (cursoId) => {
+  const [rows] = await pool.execute(
+    `
+      SELECT id, neolms_id, nombre
+      FROM cursos
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [cursoId]
+  );
+
+  return rows[0] || null;
+};
+
 const mapearCursoLocal = (curso) => ({
   id: curso.id,
   neolmsId: curso.neolms_id,
