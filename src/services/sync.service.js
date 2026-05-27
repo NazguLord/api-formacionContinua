@@ -7,6 +7,18 @@ const tareasSincronizacion = [
     path: '/api/cursos/sincronizar',
   },
   {
+    nombre: 'lecciones de cursos',
+    path: '/api/cursos/lecciones/sincronizar',
+  },
+  {
+    nombre: 'actividades de cursos',
+    path: '/api/cursos/actividades/sincronizar',
+  },
+  {
+    nombre: 'docentes de cursos',
+    path: '/api/cursos/docentes/sincronizar',
+  },
+  {
     nombre: 'alumnos',
     path: '/api/alumnos/sincronizar',
   },
@@ -113,8 +125,10 @@ export const iniciarSincronizacionAutomatica = ({ port }) => {
     const inicio = Date.now();
     console.log('Sincronizacion automatica iniciada');
 
-    try {
-      for (const tarea of tareasSincronizacion) {
+    const resumen = [];
+
+    for (const tarea of tareasSincronizacion) {
+      try {
         const resultado = await ejecutarPost({
           baseUrl,
           path: tarea.path,
@@ -123,21 +137,32 @@ export const iniciarSincronizacionAutomatica = ({ port }) => {
         });
 
         console.log(`Sincronizacion de ${tarea.nombre} completada`, resultado);
+        resumen.push({
+          tarea: tarea.nombre,
+          estado: 'completada',
+          resultado,
+        });
         await esperar(1000);
+      } catch (error) {
+        console.error(`Error en sincronizacion de ${tarea.nombre}:`, {
+          message: error.message,
+          status: error.status || null,
+          detail: error.detail || null,
+        });
+        resumen.push({
+          tarea: tarea.nombre,
+          estado: 'error',
+          message: error.message,
+          status: error.status || null,
+          detail: error.detail || null,
+        });
       }
-
-      const segundos = Math.round((Date.now() - inicio) / 1000);
-      console.log(`Sincronizacion automatica finalizada en ${segundos}s`);
-    } catch (error) {
-      console.error('Error en sincronizacion automatica:', {
-        message: error.message,
-        status: error.status || null,
-        detail: error.detail || null,
-      });
-    } finally {
-      ejecutando = false;
-      programarSiguiente();
     }
+
+    const segundos = Math.round((Date.now() - inicio) / 1000);
+    console.log(`Sincronizacion automatica finalizada en ${segundos}s`, resumen);
+    ejecutando = false;
+    programarSiguiente();
   };
 
   console.log(`Sincronizacion automatica activa cada ${intervaloMinutos} minutos`);

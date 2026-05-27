@@ -67,6 +67,83 @@ const mapearAlumnoNeolms = (alumno) => ({
 export const guardarAlumnoNeolms = async (alumno, connectionArg = null) => {
   const connection = connectionArg || pool;
   const alumnoMapeado = mapearAlumnoNeolms(alumno);
+  const params = [
+    alumnoMapeado.userid,
+    alumnoMapeado.nombres,
+    alumnoMapeado.apellidos,
+    alumnoMapeado.nombrePreferido,
+    alumnoMapeado.roles,
+    alumnoMapeado.genero,
+    alumnoMapeado.fechaNacimiento,
+    alumnoMapeado.email,
+    alumnoMapeado.telefono,
+    alumnoMapeado.celular,
+    alumnoMapeado.pais,
+    alumnoMapeado.ciudad,
+    alumnoMapeado.estadoRegion,
+    alumnoMapeado.idioma,
+    alumnoMapeado.zonaHoraria,
+    alumnoMapeado.studentId,
+    alumnoMapeado.teacherId,
+    alumnoMapeado.acercaDe,
+    alumnoMapeado.organizacionId,
+    alumnoMapeado.organizacionNombre,
+    alumnoMapeado.sisId,
+    alumnoMapeado.sisPid,
+    alumnoMapeado.archivado,
+    alumnoMapeado.archivadoEn,
+    alumnoMapeado.joinedAt,
+    alumnoMapeado.firstLoginAt,
+    alumnoMapeado.lastLoginAt,
+    alumnoMapeado.rawData,
+  ];
+
+  const [existentes] = await connection.execute(
+    'SELECT id FROM alumnos WHERE neolms_id = ? LIMIT 1',
+    [alumnoMapeado.neolmsId]
+  );
+
+  if (existentes[0]) {
+    await connection.execute(
+      `
+        UPDATE alumnos
+        SET
+          userid = ?,
+          nombres = ?,
+          apellidos = ?,
+          nombre_preferido = ?,
+          roles = ?,
+          genero = ?,
+          fecha_nacimiento = ?,
+          email = ?,
+          telefono = ?,
+          celular = ?,
+          pais = ?,
+          ciudad = ?,
+          estado_region = ?,
+          idioma = ?,
+          zona_horaria = ?,
+          student_id = ?,
+          teacher_id = ?,
+          acerca_de = ?,
+          organizacion_id = ?,
+          organizacion_nombre = ?,
+          sis_id = ?,
+          sis_pid = ?,
+          archivado = ?,
+          archivado_en = ?,
+          joined_at = ?,
+          first_login_at = ?,
+          last_login_at = ?,
+          raw_data = ?,
+          sincronizado_en = NOW()
+        WHERE id = ?
+      `,
+      [...params, existentes[0].id]
+    );
+
+    return existentes[0].id;
+  }
 
   await connection.execute(
     `
@@ -104,68 +181,8 @@ export const guardarAlumnoNeolms = async (alumno, connectionArg = null) => {
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
       )
-      ON DUPLICATE KEY UPDATE
-        userid = VALUES(userid),
-        nombres = VALUES(nombres),
-        apellidos = VALUES(apellidos),
-        nombre_preferido = VALUES(nombre_preferido),
-        roles = VALUES(roles),
-        genero = VALUES(genero),
-        fecha_nacimiento = VALUES(fecha_nacimiento),
-        email = VALUES(email),
-        telefono = VALUES(telefono),
-        celular = VALUES(celular),
-        pais = VALUES(pais),
-        ciudad = VALUES(ciudad),
-        estado_region = VALUES(estado_region),
-        idioma = VALUES(idioma),
-        zona_horaria = VALUES(zona_horaria),
-        student_id = VALUES(student_id),
-        teacher_id = VALUES(teacher_id),
-        acerca_de = VALUES(acerca_de),
-        organizacion_id = VALUES(organizacion_id),
-        organizacion_nombre = VALUES(organizacion_nombre),
-        sis_id = VALUES(sis_id),
-        sis_pid = VALUES(sis_pid),
-        archivado = VALUES(archivado),
-        archivado_en = VALUES(archivado_en),
-        joined_at = VALUES(joined_at),
-        first_login_at = VALUES(first_login_at),
-        last_login_at = VALUES(last_login_at),
-        raw_data = VALUES(raw_data),
-        sincronizado_en = NOW()
     `,
-    [
-      alumnoMapeado.neolmsId,
-      alumnoMapeado.userid,
-      alumnoMapeado.nombres,
-      alumnoMapeado.apellidos,
-      alumnoMapeado.nombrePreferido,
-      alumnoMapeado.roles,
-      alumnoMapeado.genero,
-      alumnoMapeado.fechaNacimiento,
-      alumnoMapeado.email,
-      alumnoMapeado.telefono,
-      alumnoMapeado.celular,
-      alumnoMapeado.pais,
-      alumnoMapeado.ciudad,
-      alumnoMapeado.estadoRegion,
-      alumnoMapeado.idioma,
-      alumnoMapeado.zonaHoraria,
-      alumnoMapeado.studentId,
-      alumnoMapeado.teacherId,
-      alumnoMapeado.acercaDe,
-      alumnoMapeado.organizacionId,
-      alumnoMapeado.organizacionNombre,
-      alumnoMapeado.sisId,
-      alumnoMapeado.sisPid,
-      alumnoMapeado.archivado,
-      alumnoMapeado.archivadoEn,
-      alumnoMapeado.joinedAt,
-      alumnoMapeado.firstLoginAt,
-      alumnoMapeado.lastLoginAt,
-      alumnoMapeado.rawData,
-    ]
+    [alumnoMapeado.neolmsId, ...params]
   );
 
   const [rows] = await connection.execute(
@@ -249,96 +266,121 @@ export const guardarMatriculasCursoNeolms = async ({ cursoLocalId, matriculas })
         continue;
       }
 
-      await connection.execute(
+      const alumnoId = alumnos[0].id;
+      const params = [
+        cursoLocalId,
+        alumnoId,
+        matriculaMapeada.neolmsEnrollmentId,
+        matriculaMapeada.neolmsClassId,
+        matriculaMapeada.neolmsUserId,
+        matriculaMapeada.enrolledAt,
+        matriculaMapeada.enrollType,
+        matriculaMapeada.enrolledById,
+        matriculaMapeada.started,
+        matriculaMapeada.startedAt,
+        matriculaMapeada.completed,
+        matriculaMapeada.unenrolled,
+        matriculaMapeada.deactivated,
+        matriculaMapeada.transferred,
+        matriculaMapeada.classArchived,
+        matriculaMapeada.userArchived,
+        matriculaMapeada.percent,
+        matriculaMapeada.grade,
+        matriculaMapeada.overridePercent,
+        matriculaMapeada.overrideComment,
+        matriculaMapeada.overrideById,
+        matriculaMapeada.overrideAt,
+        matriculaMapeada.timeSpent,
+        matriculaMapeada.lastVisitedAt,
+        matriculaMapeada.orderItemId,
+        matriculaMapeada.rawData,
+      ];
+
+      const [existentes] = await connection.execute(
         `
-          INSERT INTO curso_alumnos (
-            curso_id,
-            alumno_id,
-            neolms_enrollment_id,
-            neolms_class_id,
-            neolms_user_id,
-            enrolled_at,
-            enroll_type,
-            enrolled_by_id,
-            started,
-            started_at,
-            completed,
-            unenrolled,
-            deactivated,
-            transferred,
-            class_archived,
-            user_archived,
-            percent,
-            grade,
-            override_percent,
-            override_comment,
-            override_by_id,
-            override_at,
-            time_spent,
-            last_visited_at,
-            order_item_id,
-            raw_data,
-            sincronizado_en
-          ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-          )
-          ON DUPLICATE KEY UPDATE
-            curso_id = VALUES(curso_id),
-            alumno_id = VALUES(alumno_id),
-            neolms_class_id = VALUES(neolms_class_id),
-            neolms_user_id = VALUES(neolms_user_id),
-            enrolled_at = VALUES(enrolled_at),
-            enroll_type = VALUES(enroll_type),
-            enrolled_by_id = VALUES(enrolled_by_id),
-            started = VALUES(started),
-            started_at = VALUES(started_at),
-            completed = VALUES(completed),
-            unenrolled = VALUES(unenrolled),
-            deactivated = VALUES(deactivated),
-            transferred = VALUES(transferred),
-            class_archived = VALUES(class_archived),
-            user_archived = VALUES(user_archived),
-            percent = VALUES(percent),
-            grade = VALUES(grade),
-            override_percent = VALUES(override_percent),
-            override_comment = VALUES(override_comment),
-            override_by_id = VALUES(override_by_id),
-            override_at = VALUES(override_at),
-            time_spent = VALUES(time_spent),
-            last_visited_at = VALUES(last_visited_at),
-            order_item_id = VALUES(order_item_id),
-            raw_data = VALUES(raw_data),
-            sincronizado_en = NOW()
+          SELECT id
+          FROM curso_alumnos
+          WHERE neolms_enrollment_id = ?
+             OR (curso_id = ? AND alumno_id = ?)
+          LIMIT 1
         `,
-        [
-          cursoLocalId,
-          alumnos[0].id,
-          matriculaMapeada.neolmsEnrollmentId,
-          matriculaMapeada.neolmsClassId,
-          matriculaMapeada.neolmsUserId,
-          matriculaMapeada.enrolledAt,
-          matriculaMapeada.enrollType,
-          matriculaMapeada.enrolledById,
-          matriculaMapeada.started,
-          matriculaMapeada.startedAt,
-          matriculaMapeada.completed,
-          matriculaMapeada.unenrolled,
-          matriculaMapeada.deactivated,
-          matriculaMapeada.transferred,
-          matriculaMapeada.classArchived,
-          matriculaMapeada.userArchived,
-          matriculaMapeada.percent,
-          matriculaMapeada.grade,
-          matriculaMapeada.overridePercent,
-          matriculaMapeada.overrideComment,
-          matriculaMapeada.overrideById,
-          matriculaMapeada.overrideAt,
-          matriculaMapeada.timeSpent,
-          matriculaMapeada.lastVisitedAt,
-          matriculaMapeada.orderItemId,
-          matriculaMapeada.rawData,
-        ]
+        [matriculaMapeada.neolmsEnrollmentId, cursoLocalId, alumnoId]
       );
+
+      if (existentes[0]) {
+        await connection.execute(
+          `
+            UPDATE curso_alumnos
+            SET
+              curso_id = ?,
+              alumno_id = ?,
+              neolms_enrollment_id = ?,
+              neolms_class_id = ?,
+              neolms_user_id = ?,
+              enrolled_at = ?,
+              enroll_type = ?,
+              enrolled_by_id = ?,
+              started = ?,
+              started_at = ?,
+              completed = ?,
+              unenrolled = ?,
+              deactivated = ?,
+              transferred = ?,
+              class_archived = ?,
+              user_archived = ?,
+              percent = ?,
+              grade = ?,
+              override_percent = ?,
+              override_comment = ?,
+              override_by_id = ?,
+              override_at = ?,
+              time_spent = ?,
+              last_visited_at = ?,
+              order_item_id = ?,
+              raw_data = ?,
+              sincronizado_en = NOW()
+            WHERE id = ?
+          `,
+          [...params, existentes[0].id]
+        );
+      } else {
+        await connection.execute(
+          `
+            INSERT INTO curso_alumnos (
+              curso_id,
+              alumno_id,
+              neolms_enrollment_id,
+              neolms_class_id,
+              neolms_user_id,
+              enrolled_at,
+              enroll_type,
+              enrolled_by_id,
+              started,
+              started_at,
+              completed,
+              unenrolled,
+              deactivated,
+              transferred,
+              class_archived,
+              user_archived,
+              percent,
+              grade,
+              override_percent,
+              override_comment,
+              override_by_id,
+              override_at,
+              time_spent,
+              last_visited_at,
+              order_item_id,
+              raw_data,
+              sincronizado_en
+            ) VALUES (
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+            )
+          `,
+          params
+        );
+      }
 
       guardadas += 1;
     }
@@ -398,102 +440,120 @@ export const guardarCalificacionesAlumnoNeolms = async ({ alumnoLocalId, calific
         [calificacionMapeada.neolmsClassId]
       );
 
-      await connection.execute(
-        `
-          INSERT INTO alumno_calificaciones (
-            alumno_id,
-            curso_id,
-            neolms_grade_id,
-            neolms_user_id,
-            neolms_class_id,
-            grader_id,
-            assignment_id,
-            lesson_id,
-            lesson_name,
-            started,
-            started_at,
-            finished,
-            finished_at,
-            graded,
-            fully_graded,
-            graded_at,
-            score,
-            percent,
-            grade,
-            points,
-            min_points,
-            missing,
-            absent,
-            excused,
-            incomplete,
-            excused_comment,
-            teacher_comment,
-            raw_data,
-            sincronizado_en
-          ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-          )
-          ON DUPLICATE KEY UPDATE
-            alumno_id = VALUES(alumno_id),
-            curso_id = VALUES(curso_id),
-            neolms_user_id = VALUES(neolms_user_id),
-            neolms_class_id = VALUES(neolms_class_id),
-            grader_id = VALUES(grader_id),
-            assignment_id = VALUES(assignment_id),
-            lesson_id = VALUES(lesson_id),
-            lesson_name = VALUES(lesson_name),
-            started = VALUES(started),
-            started_at = VALUES(started_at),
-            finished = VALUES(finished),
-            finished_at = VALUES(finished_at),
-            graded = VALUES(graded),
-            fully_graded = VALUES(fully_graded),
-            graded_at = VALUES(graded_at),
-            score = VALUES(score),
-            percent = VALUES(percent),
-            grade = VALUES(grade),
-            points = VALUES(points),
-            min_points = VALUES(min_points),
-            missing = VALUES(missing),
-            absent = VALUES(absent),
-            excused = VALUES(excused),
-            incomplete = VALUES(incomplete),
-            excused_comment = VALUES(excused_comment),
-            teacher_comment = VALUES(teacher_comment),
-            raw_data = VALUES(raw_data),
-            sincronizado_en = NOW()
-        `,
-        [
-          alumnoLocalId,
-          cursos[0]?.id || null,
-          calificacionMapeada.neolmsGradeId,
-          calificacionMapeada.neolmsUserId,
-          calificacionMapeada.neolmsClassId,
-          calificacionMapeada.graderId,
-          calificacionMapeada.assignmentId,
-          calificacionMapeada.lessonId,
-          calificacionMapeada.lessonName,
-          calificacionMapeada.started,
-          calificacionMapeada.startedAt,
-          calificacionMapeada.finished,
-          calificacionMapeada.finishedAt,
-          calificacionMapeada.graded,
-          calificacionMapeada.fullyGraded,
-          calificacionMapeada.gradedAt,
-          calificacionMapeada.score,
-          calificacionMapeada.percent,
-          calificacionMapeada.grade,
-          calificacionMapeada.points,
-          calificacionMapeada.minPoints,
-          calificacionMapeada.missing,
-          calificacionMapeada.absent,
-          calificacionMapeada.excused,
-          calificacionMapeada.incomplete,
-          calificacionMapeada.excusedComment,
-          calificacionMapeada.teacherComment,
-          calificacionMapeada.rawData,
-        ]
+      const params = [
+        alumnoLocalId,
+        cursos[0]?.id || null,
+        calificacionMapeada.neolmsGradeId,
+        calificacionMapeada.neolmsUserId,
+        calificacionMapeada.neolmsClassId,
+        calificacionMapeada.graderId,
+        calificacionMapeada.assignmentId,
+        calificacionMapeada.lessonId,
+        calificacionMapeada.lessonName,
+        calificacionMapeada.started,
+        calificacionMapeada.startedAt,
+        calificacionMapeada.finished,
+        calificacionMapeada.finishedAt,
+        calificacionMapeada.graded,
+        calificacionMapeada.fullyGraded,
+        calificacionMapeada.gradedAt,
+        calificacionMapeada.score,
+        calificacionMapeada.percent,
+        calificacionMapeada.grade,
+        calificacionMapeada.points,
+        calificacionMapeada.minPoints,
+        calificacionMapeada.missing,
+        calificacionMapeada.absent,
+        calificacionMapeada.excused,
+        calificacionMapeada.incomplete,
+        calificacionMapeada.excusedComment,
+        calificacionMapeada.teacherComment,
+        calificacionMapeada.rawData,
+      ];
+
+      const [existentes] = await connection.execute(
+        'SELECT id FROM alumno_calificaciones WHERE neolms_grade_id = ? LIMIT 1',
+        [calificacionMapeada.neolmsGradeId]
       );
+
+      if (existentes[0]) {
+        await connection.execute(
+          `
+            UPDATE alumno_calificaciones
+            SET
+              alumno_id = ?,
+              curso_id = ?,
+              neolms_grade_id = ?,
+              neolms_user_id = ?,
+              neolms_class_id = ?,
+              grader_id = ?,
+              assignment_id = ?,
+              lesson_id = ?,
+              lesson_name = ?,
+              started = ?,
+              started_at = ?,
+              finished = ?,
+              finished_at = ?,
+              graded = ?,
+              fully_graded = ?,
+              graded_at = ?,
+              score = ?,
+              percent = ?,
+              grade = ?,
+              points = ?,
+              min_points = ?,
+              missing = ?,
+              absent = ?,
+              excused = ?,
+              incomplete = ?,
+              excused_comment = ?,
+              teacher_comment = ?,
+              raw_data = ?,
+              sincronizado_en = NOW()
+            WHERE id = ?
+          `,
+          [...params, existentes[0].id]
+        );
+      } else {
+        await connection.execute(
+          `
+            INSERT INTO alumno_calificaciones (
+              alumno_id,
+              curso_id,
+              neolms_grade_id,
+              neolms_user_id,
+              neolms_class_id,
+              grader_id,
+              assignment_id,
+              lesson_id,
+              lesson_name,
+              started,
+              started_at,
+              finished,
+              finished_at,
+              graded,
+              fully_graded,
+              graded_at,
+              score,
+              percent,
+              grade,
+              points,
+              min_points,
+              missing,
+              absent,
+              excused,
+              incomplete,
+              excused_comment,
+              teacher_comment,
+              raw_data,
+              sincronizado_en
+            ) VALUES (
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+            )
+          `,
+          params
+        );
+      }
 
       guardadas += 1;
     }

@@ -48,21 +48,35 @@ const mapearCursoNeolms = (curso) => ({
   privado: normalizarBoolean(curso.private),
   archivado: normalizarBoolean(curso.archived),
   archivadoEn: normalizarFechaHora(curso.archived_at),
+  archiverId: normalizarNumero(curso.archiver_id),
   bloqueado: normalizarBoolean(curso.locked),
   mostrarCatalogo: normalizarBoolean(curso.display_in_catalog),
   inscripcionAbierta: normalizarBoolean(curso.enrollment_open),
   inscripcionPublica: normalizarBoolean(curso.open_enrollment),
+  allowUnenrollment: normalizarBoolean(curso.allow_unenrollment),
+  deleteHistoryOnUnenroll: normalizarBoolean(curso.delete_history_on_unenroll),
+  allowReenrollment: normalizarBoolean(curso.allow_reenrollment),
+  mustRepurchaseToReenroll: normalizarBoolean(curso.must_repurchase_to_reenroll),
+  waitlistAfterLimit: normalizarBoolean(curso.waitlist_after_limit),
+  autoEnrollFromWaitlist: normalizarBoolean(curso.auto_enroll_from_waitlist),
   cuposUsados: normalizarNumero(curso.used_seats),
   maxEstudiantes: normalizarNumero(curso.max_students),
   maxCupos: normalizarNumero(curso.max_seats),
   sisId: normalizarTexto(curso.sis_id),
   sisPid: normalizarTexto(curso.sis_pid),
+  esPath: normalizarBoolean(curso.path),
   metadataCreatorId: normalizarNumero(curso.metadata?.creator_id),
   metadataCreatedAt: normalizarFechaHora(curso.metadata?.created_at),
+  currentLessonId: normalizarNumero(curso.current_lesson_id),
   idioma: normalizarTexto(curso.metadata?.language),
   edadMinima: normalizarNumero(curso.metadata?.lo_age),
   edadMaxima: normalizarNumero(curso.metadata?.hi_age),
   materia: normalizarTexto(curso.metadata?.subject),
+  taxExempt: normalizarBoolean(curso.tax_exempt),
+  weightUsingCategories: normalizarBoolean(curso.weight_using_categories),
+  weights: normalizarTexto(curso.weights),
+  disableCompletion: normalizarBoolean(curso.disable_completion),
+  autoCompleteOnVisit: normalizarBoolean(curso.auto_complete_on_visit),
   rawData: JSON.stringify(curso),
 });
 
@@ -77,11 +91,159 @@ const obtenerCategoriasCurso = (curso) => {
   return materia ? [materia] : ['Sin categoria'];
 };
 
+const obtenerTagsCurso = (curso) => {
+  if (!Array.isArray(curso?.tags)) return [];
+  return curso.tags.map((tag) => normalizarTexto(tag)).filter(Boolean);
+};
+
+const obtenerCustomFieldsCurso = (curso) => {
+  if (!curso?.custom_fields || typeof curso.custom_fields !== 'object' || Array.isArray(curso.custom_fields)) {
+    return [];
+  }
+
+  return Object.entries(curso.custom_fields)
+    .map(([campo, valor]) => ({
+      campo: normalizarTexto(campo),
+      valor: valor === null || valor === undefined ? null : String(valor),
+    }))
+    .filter((customField) => customField.campo);
+};
+
+const obtenerClassTimesCurso = (curso) => {
+  if (!Array.isArray(curso?.class_times)) return [];
+  return curso.class_times.map((classTime, index) => ({
+    posicion: index + 1,
+    descripcion: normalizarTexto(classTime?.name || classTime?.description || classTime?.title),
+    rawData: JSON.stringify(classTime),
+  }));
+};
+
 const upsertCurso = async (connection, curso) => {
   const cursoMapeado = mapearCursoNeolms(curso);
 
-  const sql = `
-    INSERT INTO cursos (
+  const params = [
+    cursoMapeado.parentNeolmsId,
+    cursoMapeado.accessCode,
+    cursoMapeado.nombre,
+    cursoMapeado.descripcionCorta,
+    cursoMapeado.descripcionLarga,
+    cursoMapeado.imagenUrl,
+    cursoMapeado.estilo,
+    cursoMapeado.fechaInicio,
+    cursoMapeado.fechaFin,
+    cursoMapeado.zonaHoraria,
+    cursoMapeado.codigoCurso,
+    cursoMapeado.codigoSeccion,
+    cursoMapeado.creditos,
+    cursoMapeado.precio,
+    cursoMapeado.organizacionId,
+    cursoMapeado.organizacionNombre,
+    cursoMapeado.privado,
+    cursoMapeado.archivado,
+    cursoMapeado.archivadoEn,
+    cursoMapeado.archiverId,
+    cursoMapeado.bloqueado,
+    cursoMapeado.mostrarCatalogo,
+    cursoMapeado.inscripcionAbierta,
+    cursoMapeado.inscripcionPublica,
+    cursoMapeado.allowUnenrollment,
+    cursoMapeado.deleteHistoryOnUnenroll,
+    cursoMapeado.allowReenrollment,
+    cursoMapeado.mustRepurchaseToReenroll,
+    cursoMapeado.waitlistAfterLimit,
+    cursoMapeado.autoEnrollFromWaitlist,
+    cursoMapeado.cuposUsados,
+    cursoMapeado.maxEstudiantes,
+    cursoMapeado.maxCupos,
+    cursoMapeado.sisId,
+    cursoMapeado.sisPid,
+    cursoMapeado.esPath,
+    cursoMapeado.metadataCreatorId,
+    cursoMapeado.metadataCreatedAt,
+    cursoMapeado.currentLessonId,
+    cursoMapeado.idioma,
+    cursoMapeado.edadMinima,
+    cursoMapeado.edadMaxima,
+    cursoMapeado.materia,
+    cursoMapeado.taxExempt,
+    cursoMapeado.weightUsingCategories,
+    cursoMapeado.weights,
+    cursoMapeado.disableCompletion,
+    cursoMapeado.autoCompleteOnVisit,
+    cursoMapeado.rawData,
+  ];
+
+  const [existentes] = await connection.execute(
+    'SELECT id FROM cursos WHERE neolms_id = ? LIMIT 1',
+    [cursoMapeado.neolmsId]
+  );
+
+  if (existentes[0]) {
+    await connection.execute(
+      `
+        UPDATE cursos
+        SET
+          parent_neolms_id = ?,
+          access_code = ?,
+          nombre = ?,
+          descripcion_corta = ?,
+          descripcion_larga = ?,
+          imagen_url = ?,
+          estilo = ?,
+          fecha_inicio = ?,
+          fecha_fin = ?,
+          zona_horaria = ?,
+          codigo_curso = ?,
+          codigo_seccion = ?,
+          creditos = ?,
+          precio = ?,
+          organizacion_id = ?,
+          organizacion_nombre = ?,
+          privado = ?,
+          archivado = ?,
+          archivado_en = ?,
+          archiver_id = ?,
+          bloqueado = ?,
+          mostrar_catalogo = ?,
+          inscripcion_abierta = ?,
+          inscripcion_publica = ?,
+          allow_unenrollment = ?,
+          delete_history_on_unenroll = ?,
+          allow_reenrollment = ?,
+          must_repurchase_to_reenroll = ?,
+          waitlist_after_limit = ?,
+          auto_enroll_from_waitlist = ?,
+          cupos_usados = ?,
+          max_estudiantes = ?,
+          max_cupos = ?,
+          sis_id = ?,
+          sis_pid = ?,
+          es_path = ?,
+          metadata_creator_id = ?,
+          metadata_created_at = ?,
+          current_lesson_id = ?,
+          idioma = ?,
+          edad_minima = ?,
+          edad_maxima = ?,
+          materia = ?,
+          tax_exempt = ?,
+          weight_using_categories = ?,
+          weights = ?,
+          disable_completion = ?,
+          auto_complete_on_visit = ?,
+          raw_data = ?,
+          sincronizado_en = NOW()
+        WHERE id = ?
+      `,
+      [...params, existentes[0].id]
+    );
+
+    return existentes[0].id;
+  }
+
+  await connection.execute(
+    `
+      INSERT INTO cursos (
       neolms_id,
       parent_neolms_id,
       access_code,
@@ -102,105 +264,43 @@ const upsertCurso = async (connection, curso) => {
       privado,
       archivado,
       archivado_en,
+      archiver_id,
       bloqueado,
       mostrar_catalogo,
       inscripcion_abierta,
       inscripcion_publica,
+      allow_unenrollment,
+      delete_history_on_unenroll,
+      allow_reenrollment,
+      must_repurchase_to_reenroll,
+      waitlist_after_limit,
+      auto_enroll_from_waitlist,
       cupos_usados,
       max_estudiantes,
       max_cupos,
       sis_id,
       sis_pid,
+      es_path,
       metadata_creator_id,
       metadata_created_at,
+      current_lesson_id,
       idioma,
       edad_minima,
       edad_maxima,
       materia,
+      tax_exempt,
+      weight_using_categories,
+      weights,
+      disable_completion,
+      auto_complete_on_visit,
       raw_data,
       sincronizado_en
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-    )
-    ON DUPLICATE KEY UPDATE
-      parent_neolms_id = VALUES(parent_neolms_id),
-      access_code = VALUES(access_code),
-      nombre = VALUES(nombre),
-      descripcion_corta = VALUES(descripcion_corta),
-      descripcion_larga = VALUES(descripcion_larga),
-      imagen_url = VALUES(imagen_url),
-      estilo = VALUES(estilo),
-      fecha_inicio = VALUES(fecha_inicio),
-      fecha_fin = VALUES(fecha_fin),
-      zona_horaria = VALUES(zona_horaria),
-      codigo_curso = VALUES(codigo_curso),
-      codigo_seccion = VALUES(codigo_seccion),
-      creditos = VALUES(creditos),
-      precio = VALUES(precio),
-      organizacion_id = VALUES(organizacion_id),
-      organizacion_nombre = VALUES(organizacion_nombre),
-      privado = VALUES(privado),
-      archivado = VALUES(archivado),
-      archivado_en = VALUES(archivado_en),
-      bloqueado = VALUES(bloqueado),
-      mostrar_catalogo = VALUES(mostrar_catalogo),
-      inscripcion_abierta = VALUES(inscripcion_abierta),
-      inscripcion_publica = VALUES(inscripcion_publica),
-      cupos_usados = VALUES(cupos_usados),
-      max_estudiantes = VALUES(max_estudiantes),
-      max_cupos = VALUES(max_cupos),
-      sis_id = VALUES(sis_id),
-      sis_pid = VALUES(sis_pid),
-      metadata_creator_id = VALUES(metadata_creator_id),
-      metadata_created_at = VALUES(metadata_created_at),
-      idioma = VALUES(idioma),
-      edad_minima = VALUES(edad_minima),
-      edad_maxima = VALUES(edad_maxima),
-      materia = VALUES(materia),
-      raw_data = VALUES(raw_data),
-      sincronizado_en = NOW()
-  `;
-
-  const params = [
-    cursoMapeado.neolmsId,
-    cursoMapeado.parentNeolmsId,
-    cursoMapeado.accessCode,
-    cursoMapeado.nombre,
-    cursoMapeado.descripcionCorta,
-    cursoMapeado.descripcionLarga,
-    cursoMapeado.imagenUrl,
-    cursoMapeado.estilo,
-    cursoMapeado.fechaInicio,
-    cursoMapeado.fechaFin,
-    cursoMapeado.zonaHoraria,
-    cursoMapeado.codigoCurso,
-    cursoMapeado.codigoSeccion,
-    cursoMapeado.creditos,
-    cursoMapeado.precio,
-    cursoMapeado.organizacionId,
-    cursoMapeado.organizacionNombre,
-    cursoMapeado.privado,
-    cursoMapeado.archivado,
-    cursoMapeado.archivadoEn,
-    cursoMapeado.bloqueado,
-    cursoMapeado.mostrarCatalogo,
-    cursoMapeado.inscripcionAbierta,
-    cursoMapeado.inscripcionPublica,
-    cursoMapeado.cuposUsados,
-    cursoMapeado.maxEstudiantes,
-    cursoMapeado.maxCupos,
-    cursoMapeado.sisId,
-    cursoMapeado.sisPid,
-    cursoMapeado.metadataCreatorId,
-    cursoMapeado.metadataCreatedAt,
-    cursoMapeado.idioma,
-    cursoMapeado.edadMinima,
-    cursoMapeado.edadMaxima,
-    cursoMapeado.materia,
-    cursoMapeado.rawData,
-  ];
-
-  await connection.execute(sql, params);
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+      )
+    `,
+    [cursoMapeado.neolmsId, ...params]
+  );
 
   const [rows] = await connection.execute(
     'SELECT id FROM cursos WHERE neolms_id = ? LIMIT 1',
@@ -211,31 +311,196 @@ const upsertCurso = async (connection, curso) => {
 };
 
 const sincronizarCategoriasCurso = async (connection, cursoId, categorias) => {
-  await connection.execute('DELETE FROM curso_categoria_relaciones WHERE curso_id = ?', [cursoId]);
+  const categoriasIds = [];
 
   for (const categoria of categorias) {
-    await connection.execute(
-      `
-        INSERT INTO curso_categorias (nombre)
-        VALUES (?)
-        ON DUPLICATE KEY UPDATE nombre = VALUES(nombre)
-      `,
-      [categoria]
-    );
-
-    const [rows] = await connection.execute(
+    const [categoriasExistentes] = await connection.execute(
       'SELECT id FROM curso_categorias WHERE nombre = ? LIMIT 1',
       [categoria]
     );
 
-    await connection.execute(
+    let categoriaId = categoriasExistentes[0]?.id;
+
+    if (!categoriaId) {
+      const [result] = await connection.execute(
+        'INSERT INTO curso_categorias (nombre) VALUES (?)',
+        [categoria]
+      );
+      categoriaId = result.insertId;
+    }
+
+    categoriasIds.push(categoriaId);
+
+    const [relacionesExistentes] = await connection.execute(
       `
-        INSERT IGNORE INTO curso_categoria_relaciones (curso_id, categoria_id)
-        VALUES (?, ?)
+        SELECT id
+        FROM curso_categoria_relaciones
+        WHERE curso_id = ?
+          AND categoria_id = ?
+        LIMIT 1
       `,
-      [cursoId, rows[0].id]
+      [cursoId, categoriaId]
     );
+
+    if (!relacionesExistentes[0]) {
+      await connection.execute(
+        `
+          INSERT INTO curso_categoria_relaciones (curso_id, categoria_id)
+          VALUES (?, ?)
+        `,
+        [cursoId, categoriaId]
+      );
+    }
   }
+
+  if (categoriasIds.length === 0) {
+    await connection.execute('DELETE FROM curso_categoria_relaciones WHERE curso_id = ?', [cursoId]);
+    return;
+  }
+
+  await connection.execute(
+    `
+      DELETE FROM curso_categoria_relaciones
+      WHERE curso_id = ?
+        AND categoria_id NOT IN (${categoriasIds.map(() => '?').join(', ')})
+    `,
+    [cursoId, ...categoriasIds]
+  );
+};
+
+const sincronizarTagsCurso = async (connection, cursoId, tags) => {
+  const tagIds = [];
+
+  for (const tag of tags) {
+    const [existentes] = await connection.execute(
+      'SELECT id FROM curso_tags WHERE curso_id = ? AND nombre = ? LIMIT 1',
+      [cursoId, tag]
+    );
+
+    if (existentes[0]) {
+      tagIds.push(existentes[0].id);
+      continue;
+    }
+
+    const [result] = await connection.execute(
+      'INSERT INTO curso_tags (curso_id, nombre) VALUES (?, ?)',
+      [cursoId, tag]
+    );
+    tagIds.push(result.insertId);
+  }
+
+  if (tagIds.length === 0) {
+    await connection.execute('DELETE FROM curso_tags WHERE curso_id = ?', [cursoId]);
+    return;
+  }
+
+  await connection.execute(
+    `
+      DELETE FROM curso_tags
+      WHERE curso_id = ?
+        AND id NOT IN (${tagIds.map(() => '?').join(', ')})
+    `,
+    [cursoId, ...tagIds]
+  );
+};
+
+const sincronizarCustomFieldsCurso = async (connection, cursoId, customFields) => {
+  const customFieldIds = [];
+
+  for (const customField of customFields) {
+    const [existentes] = await connection.execute(
+      'SELECT id FROM curso_custom_fields WHERE curso_id = ? AND campo = ? LIMIT 1',
+      [cursoId, customField.campo]
+    );
+
+    if (existentes[0]) {
+      await connection.execute(
+        `
+          UPDATE curso_custom_fields
+          SET valor = ?
+          WHERE id = ?
+        `,
+        [customField.valor, existentes[0].id]
+      );
+      customFieldIds.push(existentes[0].id);
+      continue;
+    }
+
+    const [result] = await connection.execute(
+      'INSERT INTO curso_custom_fields (curso_id, campo, valor) VALUES (?, ?, ?)',
+      [cursoId, customField.campo, customField.valor]
+    );
+    customFieldIds.push(result.insertId);
+  }
+
+  if (customFieldIds.length === 0) {
+    await connection.execute('DELETE FROM curso_custom_fields WHERE curso_id = ?', [cursoId]);
+    return;
+  }
+
+  await connection.execute(
+    `
+      DELETE FROM curso_custom_fields
+      WHERE curso_id = ?
+        AND id NOT IN (${customFieldIds.map(() => '?').join(', ')})
+    `,
+    [cursoId, ...customFieldIds]
+  );
+};
+
+const sincronizarClassTimesCurso = async (connection, cursoId, classTimes) => {
+  const classTimeIds = [];
+
+  for (const classTime of classTimes) {
+    const [existentes] = await connection.execute(
+      'SELECT id FROM curso_class_times WHERE curso_id = ? AND posicion = ? LIMIT 1',
+      [cursoId, classTime.posicion]
+    );
+
+    if (existentes[0]) {
+      await connection.execute(
+        `
+          UPDATE curso_class_times
+          SET
+            descripcion = ?,
+            raw_data = ?,
+            sincronizado_en = NOW()
+          WHERE id = ?
+        `,
+        [classTime.descripcion, classTime.rawData, existentes[0].id]
+      );
+      classTimeIds.push(existentes[0].id);
+      continue;
+    }
+
+    const [result] = await connection.execute(
+      `
+        INSERT INTO curso_class_times (
+          curso_id,
+          posicion,
+          descripcion,
+          raw_data,
+          sincronizado_en
+        ) VALUES (?, ?, ?, ?, NOW())
+      `,
+      [cursoId, classTime.posicion, classTime.descripcion, classTime.rawData]
+    );
+    classTimeIds.push(result.insertId);
+  }
+
+  if (classTimeIds.length === 0) {
+    await connection.execute('DELETE FROM curso_class_times WHERE curso_id = ?', [cursoId]);
+    return;
+  }
+
+  await connection.execute(
+    `
+      DELETE FROM curso_class_times
+      WHERE curso_id = ?
+        AND id NOT IN (${classTimeIds.map(() => '?').join(', ')})
+    `,
+    [cursoId, ...classTimeIds]
+  );
 };
 
 export const guardarCursosNeolms = async (cursos) => {
@@ -250,7 +515,13 @@ export const guardarCursosNeolms = async (cursos) => {
 
       const cursoId = await upsertCurso(connection, curso);
       const categorias = obtenerCategoriasCurso(curso);
+      const tags = obtenerTagsCurso(curso);
+      const customFields = obtenerCustomFieldsCurso(curso);
+      const classTimes = obtenerClassTimesCurso(curso);
       await sincronizarCategoriasCurso(connection, cursoId, categorias);
+      await sincronizarTagsCurso(connection, cursoId, tags);
+      await sincronizarCustomFieldsCurso(connection, cursoId, customFields);
+      await sincronizarClassTimesCurso(connection, cursoId, classTimes);
       guardados += 1;
     }
 
@@ -272,7 +543,13 @@ export const guardarCursoNeolms = async (curso) => {
 
     const cursoId = await upsertCurso(connection, curso);
     const categorias = obtenerCategoriasCurso(curso);
+    const tags = obtenerTagsCurso(curso);
+    const customFields = obtenerCustomFieldsCurso(curso);
+    const classTimes = obtenerClassTimesCurso(curso);
     await sincronizarCategoriasCurso(connection, cursoId, categorias);
+    await sincronizarTagsCurso(connection, cursoId, tags);
+    await sincronizarCustomFieldsCurso(connection, cursoId, customFields);
+    await sincronizarClassTimesCurso(connection, cursoId, classTimes);
 
     await connection.commit();
     return { cursoId };

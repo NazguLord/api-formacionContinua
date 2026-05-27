@@ -12,6 +12,10 @@ import {
 const NEOLMS_API_BASE_URL = process.env.NEOLMS_API_BASE_URL || 'https://unicah.neolms.com/api/v3';
 const LIMITE_NEOLMS = 50;
 const MAX_PAGINAS_NEOLMS = 500;
+const DEFAULT_NEOLMS_REQUEST_DELAY_MS = 750;
+const DEFAULT_NEOLMS_RATE_LIMIT_RETRY_MS = 60 * 1000;
+const MAX_REINTENTOS_NEOLMS = 3;
+let ultimaConsultaNeolmsAt = 0;
 
 const normalizarEntero = (valor, fallback, { min, max }) => {
   const numero = Number.parseInt(valor, 10);
@@ -20,6 +24,34 @@ const normalizarEntero = (valor, fallback, { min, max }) => {
 };
 
 const validarApiKeyNeolms = () => Boolean(process.env.NEOLMS_X_API_KEY);
+
+const esperar = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+
+const obtenerDelayConsultasNeolms = () => normalizarEntero(
+  process.env.NEOLMS_REQUEST_DELAY_MS,
+  DEFAULT_NEOLMS_REQUEST_DELAY_MS,
+  { min: 0, max: 10 * 1000 }
+);
+
+const obtenerDelayRateLimitNeolms = () => normalizarEntero(
+  process.env.NEOLMS_RATE_LIMIT_RETRY_MS,
+  DEFAULT_NEOLMS_RATE_LIMIT_RETRY_MS,
+  { min: 5 * 1000, max: 10 * 60 * 1000 }
+);
+
+const esperarTurnoNeolms = async () => {
+  const delayMs = obtenerDelayConsultasNeolms();
+  const ahora = Date.now();
+  const esperaPendiente = Math.max(0, ultimaConsultaNeolmsAt + delayMs - ahora);
+
+  if (esperaPendiente > 0) {
+    await esperar(esperaPendiente);
+  }
+
+  ultimaConsultaNeolmsAt = Date.now();
+};
 
 const construirUrlNeolms = (path, { limit, offset } = {}) => {
   const url = new URL(`${NEOLMS_API_BASE_URL}${path}`);
@@ -31,24 +63,37 @@ const construirUrlNeolms = (path, { limit, offset } = {}) => {
 };
 
 const consultarNeolms = async (path, { limit, offset } = {}) => {
-  const response = await fetch(construirUrlNeolms(path, { limit, offset }), {
-    method: 'GET',
-    headers: {
-      'x-api-key': process.env.NEOLMS_X_API_KEY,
-      Accept: 'application/json',
-    },
-  });
+  for (let intento = 1; intento <= MAX_REINTENTOS_NEOLMS; intento += 1) {
+    await esperarTurnoNeolms();
 
-  const data = await response.json().catch(() => null);
+    const response = await fetch(construirUrlNeolms(path, { limit, offset }), {
+      method: 'GET',
+      headers: {
+        'x-api-key': process.env.NEOLMS_X_API_KEY,
+        Accept: 'application/json',
+      },
+    });
 
-  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    if (response.ok) {
+      return data;
+    }
+
+    if (response.status === 429 && intento < MAX_REINTENTOS_NEOLMS) {
+      const retryMs = obtenerDelayRateLimitNeolms();
+      console.warn(`NEOLMS limito las consultas. Reintentando ${path} en ${retryMs}ms`);
+      await esperar(retryMs);
+      continue;
+    }
+
     const error = new Error('No se pudo consultar NEOLMS');
     error.status = response.status;
     error.detail = data?.message || data?.error || null;
     throw error;
   }
 
-  return data;
+  return null;
 };
 
 const consultarTodosNeolms = async (path) => {
