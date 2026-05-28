@@ -15,6 +15,7 @@ const DEFAULT_NEOLMS_REQUEST_DELAY_MS = 750;
 const DEFAULT_NEOLMS_RATE_LIMIT_RETRY_MS = 60 * 1000;
 const MAX_REINTENTOS_NEOLMS = 3;
 let ultimaConsultaNeolmsAt = 0;
+const usuariosNeolmsCache = new Map();
 
 const normalizarEntero = (valor, fallback, { min, max }) => {
   const numero = Number.parseInt(valor, 10);
@@ -107,6 +108,42 @@ const consultarTodosNeolms = async (path) => {
   }
 
   return registros;
+};
+
+const consultarUsuarioNeolms = async (userId) => {
+  if (!userId) return null;
+  const cacheKey = String(userId);
+
+  if (usuariosNeolmsCache.has(cacheKey)) {
+    return usuariosNeolmsCache.get(cacheKey);
+  }
+
+  try {
+    const usuario = await consultarNeolms(`/users/${userId}`);
+    usuariosNeolmsCache.set(cacheKey, usuario);
+    return usuario;
+  } catch (error) {
+    console.warn(`No se pudo obtener detalle del usuario NEOLMS ${userId}:`, {
+      status: error.status || null,
+      detail: error.detail || error.message,
+    });
+    usuariosNeolmsCache.set(cacheKey, null);
+    return null;
+  }
+};
+
+const enriquecerDocentesConUsuarios = async (docentes) => {
+  const docentesEnriquecidos = [];
+
+  for (const docente of docentes) {
+    const usuario = await consultarUsuarioNeolms(docente.user_id);
+    docentesEnriquecidos.push({
+      ...docente,
+      user: usuario,
+    });
+  }
+
+  return docentesEnriquecidos;
 };
 
 const obtenerFiltroCurso = (req) => {
@@ -202,10 +239,11 @@ export const sincronizarDocentesCursosNeolms = async (req, res) => {
 
     for (const curso of cursos) {
       const docentes = await consultarTodosNeolms(`/classes/${curso.neolms_id}/teachers`);
+      const docentesEnriquecidos = await enriquecerDocentesConUsuarios(docentes);
       totalDocentesNeolms += docentes.length;
       const resultado = await guardarDocentesCursoNeolms({
         cursoLocalId: curso.id,
-        docentes,
+        docentes: docentesEnriquecidos,
       });
       guardados += resultado.guardados;
     }

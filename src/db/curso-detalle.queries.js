@@ -393,6 +393,10 @@ const mapearDocenteNeolms = (docente) => ({
   neolmsTeacherRelationId: normalizarNumero(docente.id),
   neolmsUserId: normalizarNumero(docente.user_id),
   neolmsClassId: normalizarNumero(docente.class_id),
+  userid: normalizarTexto(docente.user?.userid),
+  nombres: normalizarTexto(docente.user?.first_name),
+  apellidos: normalizarTexto(docente.user?.last_name),
+  email: normalizarTexto(docente.user?.email),
   coteacher: normalizarBoolean(docente.coteacher),
   lastVisitedAt: normalizarFechaHora(docente.last_visited_at),
   rawData: JSON.stringify(docente),
@@ -414,6 +418,10 @@ export const guardarDocentesCursoNeolms = async ({ cursoLocalId, docentes }) => 
         docenteMapeado.neolmsTeacherRelationId,
         docenteMapeado.neolmsUserId,
         docenteMapeado.neolmsClassId,
+        docenteMapeado.userid,
+        docenteMapeado.nombres,
+        docenteMapeado.apellidos,
+        docenteMapeado.email,
         docenteMapeado.coteacher,
         docenteMapeado.lastVisitedAt,
         docenteMapeado.rawData,
@@ -441,6 +449,10 @@ export const guardarDocentesCursoNeolms = async ({ cursoLocalId, docentes }) => 
               neolms_teacher_relation_id = ?,
               neolms_user_id = ?,
               neolms_class_id = ?,
+              userid = ?,
+              nombres = ?,
+              apellidos = ?,
+              email = ?,
               coteacher = ?,
               last_visited_at = ?,
               raw_data = ?,
@@ -457,11 +469,15 @@ export const guardarDocentesCursoNeolms = async ({ cursoLocalId, docentes }) => 
               neolms_teacher_relation_id,
               neolms_user_id,
               neolms_class_id,
+              userid,
+              nombres,
+              apellidos,
+              email,
               coteacher,
               last_visited_at,
               raw_data,
               sincronizado_en
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
           `,
           params
         );
@@ -573,7 +589,7 @@ export const obtenerDocentesCursoLocal = async ({ cursoId }) => {
       SELECT *
       FROM curso_docentes
       WHERE curso_id = ?
-      ORDER BY coteacher ASC, id ASC
+      ORDER BY coteacher ASC, apellidos ASC, nombres ASC, id ASC
     `,
     [cursoId]
   );
@@ -583,6 +599,11 @@ export const obtenerDocentesCursoLocal = async ({ cursoId }) => {
     neolmsTeacherRelationId: row.neolms_teacher_relation_id,
     neolmsUserId: row.neolms_user_id,
     neolmsClassId: row.neolms_class_id,
+    userid: row.userid,
+    nombres: row.nombres,
+    apellidos: row.apellidos,
+    nombreCompleto: [row.nombres, row.apellidos].filter(Boolean).join(' ') || null,
+    email: row.email,
     coteacher: Boolean(row.coteacher),
     lastVisitedAt: row.last_visited_at,
     sincronizadoEn: row.sincronizado_en,

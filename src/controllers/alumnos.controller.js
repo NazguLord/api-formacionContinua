@@ -3,6 +3,7 @@ import {
   guardarCalificacionesAlumnoNeolms,
   guardarMatriculasCursoNeolms,
   obtenerAlumnosLocales,
+  obtenerAlumnosCursosPorMes,
   obtenerAlumnosParaSincronizarCalificaciones,
   obtenerAlumnosPorCursoLocal,
   obtenerCalificacionesAlumnoLocal,
@@ -246,6 +247,33 @@ export const obtenerAlumnos = async (req, res) => {
     console.error('Error al obtener alumnos:', error);
     return res.status(500).json({
       message: 'Error interno al obtener alumnos',
+    });
+  }
+};
+
+export const obtenerReporteAlumnosCursosPorMes = async (req, res) => {
+  try {
+    const anio = normalizarEntero(req.query?.anio, null, { min: 2000, max: 2100 });
+    const mes = normalizarEntero(req.query?.mes, null, { min: 1, max: 12 });
+
+    if (!anio || !mes) {
+      return res.status(400).json({
+        message: 'Los parametros anio y mes son obligatorios',
+      });
+    }
+
+    const data = await obtenerAlumnosCursosPorMes({ anio, mes });
+
+    return res.status(200).json({
+      anio,
+      mes,
+      data,
+      count: data.length,
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte de alumnos por curso y mes:', error);
+    return res.status(500).json({
+      message: 'Error interno al obtener reporte de alumnos por curso y mes',
     });
   }
 };

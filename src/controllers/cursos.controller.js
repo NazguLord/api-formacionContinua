@@ -4,6 +4,9 @@ import {
   obtenerCategoriasCursosLocales,
   obtenerCursoLocalPorId,
   obtenerCursosLocales,
+  obtenerCursosIniciadosPorMes,
+  obtenerEstadisticasCursosMensuales,
+  obtenerResumenCursos,
 } from '../db/cursos.queries.js';
 
 const NEOLMS_CLASSES_URL =
@@ -240,6 +243,93 @@ export const obtenerCursos = async (req, res) => {
     console.error('Error al obtener cursos:', error);
     return res.status(error.status || 500).json({
       message: error.message || 'Error interno al obtener cursos',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const obtenerEstadisticasMensualesCursos = async (req, res) => {
+  try {
+    const anio = normalizarEntero(req.query?.anio, null, { min: 2000, max: 2100 });
+
+    if (!anio) {
+      return res.status(400).json({
+        message: 'El parametro anio es obligatorio',
+      });
+    }
+
+    const resultado = await obtenerEstadisticasCursosMensuales({ anio });
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('Error al obtener estadisticas mensuales de cursos:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener estadisticas mensuales de cursos',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const obtenerReporteCursosIniciadosPorMes = async (req, res) => {
+  try {
+    const anio = normalizarEntero(req.query?.anio, null, { min: 2000, max: 2100 });
+    const mes = normalizarEntero(req.query?.mes, null, { min: 1, max: 12 });
+
+    if (!anio || !mes) {
+      return res.status(400).json({
+        message: 'Los parametros anio y mes son obligatorios',
+      });
+    }
+
+    const data = await obtenerCursosIniciadosPorMes({ anio, mes });
+
+    return res.status(200).json({
+      anio,
+      mes,
+      data,
+      count: data.length,
+    });
+  } catch (error) {
+    console.error('Error al obtener cursos iniciados por mes:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener cursos iniciados por mes',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const obtenerResumenEstadisticoCursos = async (req, res) => {
+  try {
+    const anio = req.query?.anio
+      ? normalizarEntero(req.query.anio, null, { min: 2000, max: 2100 })
+      : null;
+    const mes = req.query?.mes
+      ? normalizarEntero(req.query.mes, null, { min: 1, max: 12 })
+      : null;
+
+    if (req.query?.anio && !anio) {
+      return res.status(400).json({
+        message: 'El parametro anio no es valido',
+      });
+    }
+
+    if (req.query?.mes && !mes) {
+      return res.status(400).json({
+        message: 'El parametro mes no es valido',
+      });
+    }
+
+    if (mes && !anio) {
+      return res.status(400).json({
+        message: 'Debe enviar anio cuando filtre por mes',
+      });
+    }
+
+    const resultado = await obtenerResumenCursos({ anio, mes });
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('Error al obtener resumen estadistico de cursos:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener resumen estadistico de cursos',
       detail: error.detail || null,
     });
   }

@@ -3,6 +3,7 @@ import {
   obtenerAlumnos,
   obtenerAlumnosPorCurso,
   obtenerCalificacionesAlumno,
+  obtenerReporteAlumnosCursosPorMes,
   sincronizarAlumnosCursosNeolms,
   sincronizarAlumnosNeolms,
   sincronizarCalificacionesAlumnosNeolms,
@@ -21,6 +22,7 @@ router.post(
 );
 
 router.get('/alumnos', verificarApiKeyCifer, obtenerAlumnos);
+router.get('/reportes/alumnos-cursos', verificarApiKeyCifer, obtenerReporteAlumnosCursosPorMes);
 router.get('/cursos/:cursoId/alumnos', verificarApiKeyCifer, obtenerAlumnosPorCurso);
 router.get('/alumnos/:alumnoId/calificaciones', verificarApiKeyCifer, obtenerCalificacionesAlumno);
 

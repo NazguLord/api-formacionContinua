@@ -215,6 +215,10 @@ CREATE TABLE IF NOT EXISTS curso_docentes (
     neolms_teacher_relation_id BIGINT UNSIGNED NOT NULL,
     neolms_user_id BIGINT UNSIGNED NOT NULL,
     neolms_class_id BIGINT UNSIGNED NOT NULL,
+    userid VARCHAR(100) NULL,
+    nombres VARCHAR(150) NULL,
+    apellidos VARCHAR(150) NULL,
+    email VARCHAR(180) NULL,
     coteacher TINYINT(1) NOT NULL DEFAULT 0,
     last_visited_at DATETIME NULL,
     raw_data JSON NULL,
@@ -227,6 +231,8 @@ CREATE TABLE IF NOT EXISTS curso_docentes (
     KEY idx_curso_docentes_curso_id (curso_id),
     KEY idx_curso_docentes_neolms_user_id (neolms_user_id),
     KEY idx_curso_docentes_neolms_class_id (neolms_class_id),
+    KEY idx_curso_docentes_nombre (nombres, apellidos),
+    KEY idx_curso_docentes_email (email),
     CONSTRAINT fk_curso_docentes_curso
         FOREIGN KEY (curso_id)
         REFERENCES cursos (id)

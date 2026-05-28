@@ -719,3 +719,266 @@ export const obtenerCategoriasCursosLocales = async () => {
 
   return rows;
 };
+
+export const obtenerEstadisticasCursosMensuales = async ({ anio }) => {
+  const meses = Array.from({ length: 12 }, (_, index) => ({
+    mes: index + 1,
+    cursosIniciados: 0,
+    matriculados: 0,
+  }));
+
+  const [cursosRows] = await pool.execute(
+    `
+      SELECT
+        MONTH(fecha_inicio) AS mes,
+        COUNT(*) AS total
+      FROM cursos
+      WHERE fecha_inicio IS NOT NULL
+        AND YEAR(fecha_inicio) = ?
+      GROUP BY MONTH(fecha_inicio)
+    `,
+    [anio]
+  );
+
+  const [matriculasRows] = await pool.execute(
+    `
+      SELECT
+        MONTH(enrolled_at) AS mes,
+        COUNT(*) AS total
+      FROM curso_alumnos
+      WHERE enrolled_at IS NOT NULL
+        AND YEAR(enrolled_at) = ?
+      GROUP BY MONTH(enrolled_at)
+    `,
+    [anio]
+  );
+
+  for (const row of cursosRows) {
+    const mes = Number(row.mes);
+    if (mes >= 1 && mes <= 12) {
+      meses[mes - 1].cursosIniciados = Number(row.total);
+    }
+  }
+
+  for (const row of matriculasRows) {
+    const mes = Number(row.mes);
+    if (mes >= 1 && mes <= 12) {
+      meses[mes - 1].matriculados = Number(row.total);
+    }
+  }
+
+  return {
+    anio,
+    data: meses,
+    totales: {
+      cursosIniciados: meses.reduce((total, mes) => total + mes.cursosIniciados, 0),
+      matriculados: meses.reduce((total, mes) => total + mes.matriculados, 0),
+    },
+  };
+};
+
+export const obtenerCursosIniciadosPorMes = async ({ anio, mes }) => {
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        c.id,
+        c.neolms_id,
+        c.nombre,
+        c.descripcion_corta,
+        c.imagen_url,
+        c.estilo,
+        c.fecha_inicio,
+        c.fecha_fin,
+        c.precio,
+        c.organizacion_id,
+        c.organizacion_nombre,
+        c.archivado,
+        c.bloqueado,
+        c.mostrar_catalogo,
+        c.inscripcion_abierta,
+        c.inscripcion_publica,
+        c.cupos_usados,
+        c.max_estudiantes,
+        c.max_cupos,
+        c.sincronizado_en,
+        GROUP_CONCAT(DISTINCT cc.nombre ORDER BY cc.nombre SEPARATOR '||') AS categorias,
+        COUNT(DISTINCT ca.id) AS total_matriculados,
+        CASE
+          WHEN c.archivado = 1 THEN 'Archivado'
+          WHEN c.bloqueado = 1 THEN 'Bloqueado'
+          WHEN c.fecha_inicio IS NOT NULL AND c.fecha_inicio > CURDATE() THEN 'Proximo'
+          WHEN c.fecha_fin IS NOT NULL AND c.fecha_fin < CURDATE() THEN 'Finalizado'
+          ELSE 'En curso'
+        END AS estado
+      FROM cursos c
+      LEFT JOIN curso_categoria_relaciones ccr ON ccr.curso_id = c.id
+      LEFT JOIN curso_categorias cc ON cc.id = ccr.categoria_id
+      LEFT JOIN curso_alumnos ca ON ca.curso_id = c.id
+      WHERE c.fecha_inicio IS NOT NULL
+        AND YEAR(c.fecha_inicio) = ?
+        AND MONTH(c.fecha_inicio) = ?
+      GROUP BY c.id
+      ORDER BY c.fecha_inicio ASC, c.nombre ASC
+    `,
+    [anio, mes]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    neolmsId: row.neolms_id,
+    nombre: row.nombre,
+    descripcionCorta: row.descripcion_corta,
+    imagenUrl: row.imagen_url,
+    estilo: row.estilo,
+    fechaInicio: row.fecha_inicio,
+    fechaFin: row.fecha_fin,
+    precio: row.precio,
+    organizacionId: row.organizacion_id,
+    organizacionNombre: row.organizacion_nombre,
+    archivado: Boolean(row.archivado),
+    bloqueado: Boolean(row.bloqueado),
+    mostrarCatalogo: Boolean(row.mostrar_catalogo),
+    inscripcionAbierta: Boolean(row.inscripcion_abierta),
+    inscripcionPublica: Boolean(row.inscripcion_publica),
+    cuposUsados: row.cupos_usados,
+    maxEstudiantes: row.max_estudiantes,
+    maxCupos: row.max_cupos,
+    categorias: row.categorias ? row.categorias.split('||').filter(Boolean) : [],
+    totalMatriculados: Number(row.total_matriculados),
+    estado: row.estado,
+    sincronizadoEn: row.sincronizado_en,
+  }));
+};
+
+export const obtenerResumenCursos = async ({ anio = null, mes = null }) => {
+  const whereCursos = ['1 = 1'];
+  const paramsCursos = [];
+
+  if (anio) {
+    whereCursos.push('c.fecha_inicio IS NOT NULL');
+    whereCursos.push('YEAR(c.fecha_inicio) = ?');
+    paramsCursos.push(anio);
+  }
+
+  if (mes) {
+    whereCursos.push('MONTH(c.fecha_inicio) = ?');
+    paramsCursos.push(mes);
+  }
+
+  const whereSql = whereCursos.join(' AND ');
+
+  const estadoCase = `
+    CASE
+      WHEN c.archivado = 1 THEN 'Archivado'
+      WHEN c.bloqueado = 1 THEN 'Bloqueado'
+      WHEN c.fecha_inicio IS NOT NULL AND c.fecha_inicio > CURDATE() THEN 'Proximo'
+      WHEN c.fecha_fin IS NOT NULL AND c.fecha_fin < CURDATE() THEN 'Finalizado'
+      ELSE 'En curso'
+    END
+  `;
+
+  const [totalesRows] = await pool.execute(
+    `
+      SELECT
+        SUM(CASE WHEN ${estadoCase} = 'En curso' THEN 1 ELSE 0 END) AS cursos_activos,
+        COUNT(DISTINCT ca.alumno_id) AS estudiantes_inscritos
+      FROM cursos c
+      LEFT JOIN curso_alumnos ca ON ca.curso_id = c.id
+      WHERE ${whereSql}
+    `,
+    paramsCursos
+  );
+
+  const [mayorInscripcionRows] = await pool.execute(
+    `
+      SELECT
+        c.id,
+        c.neolms_id,
+        c.nombre,
+        COUNT(ca.id) AS inscritos
+      FROM cursos c
+      LEFT JOIN curso_alumnos ca ON ca.curso_id = c.id
+      WHERE ${whereSql}
+      GROUP BY c.id
+      ORDER BY inscritos DESC, c.nombre ASC
+      LIMIT 5
+    `,
+    paramsCursos
+  );
+
+  const [menorInscripcionRows] = await pool.execute(
+    `
+      SELECT
+        c.id,
+        c.neolms_id,
+        c.nombre,
+        COUNT(ca.id) AS inscritos
+      FROM cursos c
+      LEFT JOIN curso_alumnos ca ON ca.curso_id = c.id
+      WHERE ${whereSql}
+      GROUP BY c.id
+      ORDER BY inscritos ASC, c.nombre ASC
+      LIMIT 5
+    `,
+    paramsCursos
+  );
+
+  const [estadosRows] = await pool.execute(
+    `
+      SELECT
+        ${estadoCase} AS estado,
+        COUNT(*) AS total
+      FROM cursos c
+      WHERE ${whereSql}
+      GROUP BY estado
+      ORDER BY total DESC, estado ASC
+    `,
+    paramsCursos
+  );
+
+  const [categoriasRows] = await pool.execute(
+    `
+      SELECT
+        cc.id,
+        cc.nombre,
+        COUNT(DISTINCT c.id) AS total_cursos
+      FROM cursos c
+      INNER JOIN curso_categoria_relaciones ccr ON ccr.curso_id = c.id
+      INNER JOIN curso_categorias cc ON cc.id = ccr.categoria_id
+      WHERE ${whereSql}
+      GROUP BY cc.id, cc.nombre
+      ORDER BY total_cursos DESC, cc.nombre ASC
+      LIMIT 5
+    `,
+    paramsCursos
+  );
+
+  const mapearCursoInscripcion = (row) => ({
+    cursoId: row.id,
+    neolmsId: row.neolms_id,
+    nombre: row.nombre,
+    inscritos: Number(row.inscritos),
+  });
+
+  return {
+    filtros: {
+      anio,
+      mes,
+    },
+    totales: {
+      cursosActivos: Number(totalesRows[0]?.cursos_activos || 0),
+      estudiantesInscritos: Number(totalesRows[0]?.estudiantes_inscritos || 0),
+    },
+    cursosMayorInscripcion: mayorInscripcionRows.map(mapearCursoInscripcion),
+    cursosMenorInscripcion: menorInscripcionRows.map(mapearCursoInscripcion),
+    cursosPorEstado: estadosRows.map((row) => ({
+      estado: row.estado,
+      total: Number(row.total),
+    })),
+    topCategorias: categoriasRows.map((row) => ({
+      categoriaId: row.id,
+      categoria: row.nombre,
+      totalCursos: Number(row.total_cursos),
+    })),
+  };
+};

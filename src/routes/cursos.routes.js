@@ -4,6 +4,9 @@ import {
   modificarCursoNeolms,
   obtenerCategoriasCursos,
   obtenerCursos,
+  obtenerEstadisticasMensualesCursos,
+  obtenerReporteCursosIniciadosPorMes,
+  obtenerResumenEstadisticoCursos,
   sincronizarCursosNeolms,
 } from '../controllers/cursos.controller.js';
 import {
@@ -29,6 +32,9 @@ router.patch('/cursos/:cursoId/actualizar', verificarApiKeyCifer, modificarCurso
 router.patch('/cursos/:cursoId', verificarApiKeyCifer, modificarCursoNeolms);
 router.get('/categorias', verificarApiKeyCifer, obtenerCategoriasCursos);
 router.get('/cursos/categorias', verificarApiKeyCifer, obtenerCategoriasCursos);
+router.get('/cursos/estadisticas/mensuales', verificarApiKeyCifer, obtenerEstadisticasMensualesCursos);
+router.get('/reportes/resumen-cursos', verificarApiKeyCifer, obtenerResumenEstadisticoCursos);
+router.get('/reportes/cursos-iniciados', verificarApiKeyCifer, obtenerReporteCursosIniciadosPorMes);
 router.get('/cursos/:cursoId/lecciones', verificarApiKeyCifer, obtenerLeccionesCurso);
 router.get('/cursos/:cursoId/actividades', verificarApiKeyCifer, obtenerActividadesCurso);
 router.get('/cursos/:cursoId/docentes', verificarApiKeyCifer, obtenerDocentesCurso);

@@ -848,3 +848,81 @@ export const obtenerCalificacionesAlumnoLocal = async ({ alumnoId, page, limit }
     },
   };
 };
+
+export const obtenerAlumnosCursosPorMes = async ({ anio, mes }) => {
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        ca.id AS matricula_id,
+        ca.enrolled_at,
+        ca.started,
+        ca.completed,
+        ca.unenrolled,
+        ca.deactivated,
+        ca.percent,
+        ca.grade,
+        a.id AS alumno_id,
+        a.neolms_id AS alumno_neolms_id,
+        a.userid,
+        a.nombres,
+        a.apellidos,
+        a.email,
+        c.id AS curso_id,
+        c.neolms_id AS curso_neolms_id,
+        c.nombre AS curso_nombre,
+        c.fecha_inicio,
+        c.fecha_fin,
+        c.archivado,
+        c.bloqueado,
+        CASE
+          WHEN c.archivado = 1 THEN 'Archivado'
+          WHEN c.bloqueado = 1 THEN 'Bloqueado'
+          WHEN c.fecha_inicio IS NOT NULL AND c.fecha_inicio > CURDATE() THEN 'Proximo'
+          WHEN c.fecha_fin IS NOT NULL AND c.fecha_fin < CURDATE() THEN 'Finalizado'
+          ELSE 'En curso'
+        END AS estado_curso,
+        CASE
+          WHEN ca.deactivated = 1 THEN 'Desactivado'
+          WHEN ca.unenrolled = 1 THEN 'Retirado'
+          WHEN ca.completed = 1 THEN 'Completado'
+          WHEN ca.started = 1 THEN 'Iniciado'
+          ELSE 'Matriculado'
+        END AS estado_matricula
+      FROM curso_alumnos ca
+      INNER JOIN alumnos a ON a.id = ca.alumno_id
+      INNER JOIN cursos c ON c.id = ca.curso_id
+      WHERE ca.enrolled_at IS NOT NULL
+        AND YEAR(ca.enrolled_at) = ?
+        AND MONTH(ca.enrolled_at) = ?
+      ORDER BY ca.enrolled_at ASC, c.nombre ASC, a.apellidos ASC, a.nombres ASC
+    `,
+    [anio, mes]
+  );
+
+  return rows.map((row) => ({
+    matriculaId: row.matricula_id,
+    enrolledAt: row.enrolled_at,
+    percent: row.percent,
+    grade: row.grade,
+    estadoMatricula: row.estado_matricula,
+    alumno: {
+      id: row.alumno_id,
+      neolmsId: row.alumno_neolms_id,
+      userid: row.userid,
+      nombres: row.nombres,
+      apellidos: row.apellidos,
+      nombreCompleto: [row.nombres, row.apellidos].filter(Boolean).join(' ') || null,
+      email: row.email,
+    },
+    curso: {
+      id: row.curso_id,
+      neolmsId: row.curso_neolms_id,
+      nombre: row.curso_nombre,
+      fechaInicio: row.fecha_inicio,
+      fechaFin: row.fecha_fin,
+      archivado: Boolean(row.archivado),
+      bloqueado: Boolean(row.bloqueado),
+      estado: row.estado_curso,
+    },
+  }));
+};
