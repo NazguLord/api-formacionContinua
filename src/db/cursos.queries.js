@@ -705,6 +705,110 @@ export const obtenerCursosLocales = async ({ page, limit, category, search }) =>
   };
 };
 
+export const obtenerCursosActivosLocales = async ({ page, limit, category, search }) => {
+  const limitSeguro = Number(limit);
+  const offset = (Number(page) - 1) * limitSeguro;
+  const where = [
+    'c.archivado = 0',
+    'c.bloqueado = 0',
+    '(c.fecha_inicio IS NULL OR c.fecha_inicio <= CURDATE())',
+    '(c.fecha_fin IS NULL OR c.fecha_fin >= CURDATE())',
+  ];
+  const params = [];
+
+  if (category) {
+    where.push(`
+      EXISTS (
+        SELECT 1
+        FROM curso_categoria_relaciones ccr_filter
+        INNER JOIN curso_categorias cc_filter ON cc_filter.id = ccr_filter.categoria_id
+        WHERE ccr_filter.curso_id = c.id
+          AND cc_filter.nombre = ?
+      )
+    `);
+    params.push(category);
+  }
+
+  if (search) {
+    where.push('(c.nombre LIKE ? OR c.descripcion_corta LIKE ? OR c.descripcion_larga LIKE ?)');
+    const searchLike = `%${search}%`;
+    params.push(searchLike, searchLike, searchLike);
+  }
+
+  const whereSql = where.join(' AND ');
+
+  const [countRows] = await pool.execute(
+    `
+      SELECT COUNT(*) AS total
+      FROM cursos c
+      WHERE ${whereSql}
+    `,
+    params
+  );
+
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        c.id,
+        c.neolms_id,
+        c.nombre,
+        c.descripcion_corta,
+        c.descripcion_larga,
+        c.imagen_url,
+        c.estilo,
+        c.fecha_inicio,
+        c.fecha_fin,
+        c.codigo_curso,
+        c.codigo_seccion,
+        c.creditos,
+        c.precio,
+        c.organizacion_id,
+        c.organizacion_nombre,
+        c.privado,
+        c.archivado,
+        c.bloqueado,
+        c.mostrar_catalogo,
+        c.inscripcion_abierta,
+        c.inscripcion_publica,
+        c.cupos_usados,
+        c.max_estudiantes,
+        c.max_cupos,
+        c.idioma,
+        c.edad_minima,
+        c.edad_maxima,
+        c.materia,
+        c.sincronizado_en,
+        c.actualizado_en,
+        GROUP_CONCAT(DISTINCT cc.nombre ORDER BY cc.nombre SEPARATOR '||') AS categorias
+      FROM cursos c
+      LEFT JOIN curso_categoria_relaciones ccr ON ccr.curso_id = c.id
+      LEFT JOIN curso_categorias cc ON cc.id = ccr.categoria_id
+      WHERE ${whereSql}
+      GROUP BY c.id
+      ORDER BY c.fecha_inicio ASC, c.nombre ASC
+      LIMIT ${limitSeguro} OFFSET ${offset}
+    `,
+    params
+  );
+
+  const total = countRows[0]?.total || 0;
+
+  return {
+    data: rows.map((row) => ({
+      ...mapearCursoLocal(row),
+      estado: 'En curso',
+    })),
+    pagination: {
+      page,
+      limit,
+      count: rows.length,
+      total,
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+  };
+};
+
 export const obtenerCategoriasCursosLocales = async () => {
   const [rows] = await pool.execute(`
     SELECT

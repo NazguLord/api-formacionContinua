@@ -1,8 +1,12 @@
 import {
+  obtenerCursoCompletoLocal,
+} from '../db/curso-completo.queries.js';
+import {
   guardarCursoNeolms,
   guardarCursosNeolms,
   obtenerCategoriasCursosLocales,
   obtenerCursoLocalPorId,
+  obtenerCursosActivosLocales,
   obtenerCursosLocales,
   obtenerCursosIniciadosPorMes,
   obtenerEstadisticasCursosMensuales,
@@ -243,6 +247,55 @@ export const obtenerCursos = async (req, res) => {
     console.error('Error al obtener cursos:', error);
     return res.status(error.status || 500).json({
       message: error.message || 'Error interno al obtener cursos',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const obtenerCursosActivos = async (req, res) => {
+  try {
+    const page = normalizarEntero(req.query?.page, 1, { min: 1, max: 10000 });
+    const limit = normalizarEntero(req.query?.limit, 10, { min: 1, max: 50 });
+    const category = String(req.query?.category || '').trim();
+    const search = String(req.query?.search || req.query?.q || '').trim();
+    const resultado = await obtenerCursosActivosLocales({ page, limit, category, search });
+
+    return res.status(200).json({
+      data: resultado.data,
+      pagination: resultado.pagination,
+    });
+  } catch (error) {
+    console.error('Error al obtener cursos activos:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener cursos activos',
+      detail: error.detail || null,
+    });
+  }
+};
+
+export const obtenerDetalleCompletoCurso = async (req, res) => {
+  try {
+    const cursoId = normalizarEntero(req.params?.cursoId, null, { min: 1, max: 999999999 });
+
+    if (!cursoId) {
+      return res.status(400).json({
+        message: 'El cursoId es obligatorio',
+      });
+    }
+
+    const resultado = await obtenerCursoCompletoLocal({ cursoId });
+
+    if (!resultado) {
+      return res.status(404).json({
+        message: 'El curso indicado no existe',
+      });
+    }
+
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('Error al obtener detalle completo del curso:', error);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al obtener detalle completo del curso',
       detail: error.detail || null,
     });
   }

@@ -3,7 +3,9 @@ import {
   actualizarCursoNeolms,
   modificarCursoNeolms,
   obtenerCategoriasCursos,
+  obtenerCursosActivos,
   obtenerCursos,
+  obtenerDetalleCompletoCurso,
   obtenerEstadisticasMensualesCursos,
   obtenerReporteCursosIniciadosPorMes,
   obtenerResumenEstadisticoCursos,
@@ -35,9 +37,11 @@ router.get('/cursos/categorias', verificarApiKeyCifer, obtenerCategoriasCursos);
 router.get('/cursos/estadisticas/mensuales', verificarApiKeyCifer, obtenerEstadisticasMensualesCursos);
 router.get('/reportes/resumen-cursos', verificarApiKeyCifer, obtenerResumenEstadisticoCursos);
 router.get('/reportes/cursos-iniciados', verificarApiKeyCifer, obtenerReporteCursosIniciadosPorMes);
+router.get('/cursos/:cursoId/detalle', verificarApiKeyCifer, obtenerDetalleCompletoCurso);
 router.get('/cursos/:cursoId/lecciones', verificarApiKeyCifer, obtenerLeccionesCurso);
 router.get('/cursos/:cursoId/actividades', verificarApiKeyCifer, obtenerActividadesCurso);
 router.get('/cursos/:cursoId/docentes', verificarApiKeyCifer, obtenerDocentesCurso);
+router.get('/cursos/activos', verificarApiKeyCifer, obtenerCursosActivos);
 router.get('/cursos', verificarApiKeyCifer, obtenerCursos);
 
 export default router;
