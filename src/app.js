@@ -7,7 +7,10 @@ import routes from './routes/index.js';
 dotenv.config();
 
 const app = express();
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176')
+const allowedOrigins = (
+  process.env.CORS_ORIGINS ||
+  'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://dev-formacionc.unicah.edu,http://dev-formacionc.unicah.edu:81'
+)
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
