@@ -1,12 +1,15 @@
 import {
   crearRegistroSesionUsuario,
   crearRegistroUsuarioConRol,
+  eliminarRegistroSesionPorToken,
   obtenerAlumnoRegistroPorNumeroCuenta,
   obtenerEmpleadoActivoPorIdentidad,
+  obtenerRegistroSesionValidaPorToken,
   obtenerRegistroUsuarioLogin,
   obtenerRegistroUsuarioPorCorreo,
   obtenerRegistroUsuarioPorIdentidad,
 } from '../db/registro-usuarios.queries.js';
+import jwt from 'jsonwebtoken';
 import { comparePassword, hashPassword } from '../utils/hash.js';
 import { generarToken } from '../utils/jwt.js';
 
@@ -32,6 +35,58 @@ const obtenerFechaExpiracionSesion = () => {
   const fechaExpiracion = new Date();
   fechaExpiracion.setHours(fechaExpiracion.getHours() + 8);
   return fechaExpiracion;
+};
+
+const obtenerOpcionesCookieSesion = (fechaExpiracion) => {
+  const cookieSecure = String(process.env.COOKIE_SECURE ?? 'false').toLowerCase() === 'true';
+  const cookieSameSite = String(process.env.COOKIE_SAME_SITE ?? 'lax').toLowerCase();
+
+  return {
+    httpOnly: true,
+    secure: cookieSecure,
+    sameSite: cookieSameSite,
+    expires: fechaExpiracion,
+    path: '/',
+  };
+};
+
+const obtenerOpcionesLimpiarCookieSesion = () => {
+  const { expires, ...opcionesCookie } = obtenerOpcionesCookieSesion(new Date(0));
+  return opcionesCookie;
+};
+
+const obtenerTokenRegistroRequest = (req) => {
+  const tokenCookie = req.cookies?.registro_token;
+  const authorization = req.headers?.authorization || '';
+
+  if (tokenCookie) return tokenCookie;
+  if (authorization.startsWith('Bearer ')) return authorization.slice(7);
+
+  return null;
+};
+
+const formatearUsuarioSesion = (sesion) => {
+  const roles = sesion.roles ? sesion.roles.split(',') : [];
+
+  return {
+    id: sesion.usuario_id,
+    nombreCompleto: sesion.nombre_completo,
+    correo: sesion.correo,
+    identidad: sesion.identidad,
+    tipoUsuario: sesion.tipo_usuario,
+    numeroCuenta: sesion.numero_cuenta,
+    descuentoAplicable: Boolean(sesion.descuento_aplicable),
+    verificado: Boolean(sesion.verificado),
+    fuenteVerificacion: sesion.fuente_verificacion,
+    registroCueReg: sesion.registro_cue_reg,
+    registroCueCod: sesion.registro_cue_cod,
+    registroTuvoPlan: Boolean(sesion.registro_tuvo_plan),
+    registroPlanActivo: Boolean(sesion.registro_plan_activo),
+    workcloudEmpCod: sesion.workcloud_emp_cod,
+    workcloudContratoCod: sesion.workcloud_contrato_cod,
+    estado: sesion.estado,
+    roles,
+  };
 };
 
 const obtenerRolPorTipoUsuario = (tipoUsuario) => {
@@ -283,12 +338,7 @@ export const loginRegistroUsuario = async (req, res) => {
       fechaExpiracion,
     });
 
-    res.cookie('registro_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: fechaExpiracion,
-    });
+    res.cookie('registro_token', token, obtenerOpcionesCookieSesion(fechaExpiracion));
 
     return res.status(200).json({
       message: 'Login correcto',
@@ -317,6 +367,72 @@ export const loginRegistroUsuario = async (req, res) => {
     console.error('Error al iniciar sesion de registro:', error);
     return res.status(500).json({
       message: 'Error interno al iniciar sesion',
+    });
+  }
+};
+
+export const validarSesionRegistroUsuario = async (req, res) => {
+  const token = obtenerTokenRegistroRequest(req);
+
+  if (!token) {
+    return res.status(200).json({
+      activa: false,
+      message: 'Sesion no encontrada',
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded?.origen !== 'registro_usuarios') {
+      return res.status(200).json({
+        activa: false,
+        message: 'Sesion invalida',
+      });
+    }
+
+    const sesion = await obtenerRegistroSesionValidaPorToken(token);
+    if (!sesion || Number(sesion.usuario_id) !== Number(decoded.id)) {
+      return res.status(200).json({
+        activa: false,
+        message: 'Sesion invalida o expirada',
+      });
+    }
+
+    return res.status(200).json({
+      activa: true,
+      usuario: formatearUsuarioSesion(sesion),
+      sesion: {
+        id: sesion.sesion_id,
+        fechaCreacion: sesion.fecha_creacion,
+        fechaExpiracion: sesion.fecha_expiracion,
+      },
+    });
+  } catch (error) {
+    return res.status(200).json({
+      activa: false,
+      message: error?.name === 'TokenExpiredError' ? 'Sesion expirada' : 'Sesion invalida',
+    });
+  }
+};
+
+export const logoutRegistroUsuario = async (req, res) => {
+  try {
+    const token = obtenerTokenRegistroRequest(req);
+
+    if (token) {
+      await eliminarRegistroSesionPorToken(token);
+    }
+
+    res.clearCookie('registro_token', obtenerOpcionesLimpiarCookieSesion());
+
+    return res.status(200).json({
+      message: 'Sesion cerrada correctamente',
+    });
+  } catch (error) {
+    console.error('Error al cerrar sesion de registro:', error);
+    return res.status(500).json({
+      message: 'Error interno al cerrar sesion',
     });
   }
 };

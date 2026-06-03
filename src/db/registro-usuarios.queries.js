@@ -92,6 +92,77 @@ export const crearRegistroSesionUsuario = async ({ usuarioId, token, fechaExpira
   return result.insertId;
 };
 
+export const obtenerRegistroSesionValidaPorToken = async (token) => {
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        s.id AS sesion_id,
+        s.usuario_id,
+        s.fecha_creacion,
+        s.fecha_expiracion,
+        u.nombre_completo,
+        u.correo,
+        u.identidad,
+        u.tipo_usuario,
+        u.numero_cuenta,
+        u.descuento_aplicable,
+        u.verificado,
+        u.fuente_verificacion,
+        u.registro_cue_reg,
+        u.registro_cue_cod,
+        u.registro_tuvo_plan,
+        u.registro_plan_activo,
+        u.workcloud_emp_cod,
+        u.workcloud_contrato_cod,
+        u.estado,
+        GROUP_CONCAT(r.nombre ORDER BY r.nombre SEPARATOR ',') AS roles
+      FROM registro_sesiones s
+      INNER JOIN registro_usuarios u ON u.id = s.usuario_id
+      LEFT JOIN registro_usuario_roles ur ON ur.usuario_id = u.id
+      LEFT JOIN registro_roles r ON r.id = ur.rol_id
+      WHERE s.token = ?
+        AND u.estado = 'ACTIVO'
+        AND (s.fecha_expiracion IS NULL OR s.fecha_expiracion > NOW())
+      GROUP BY
+        s.id,
+        s.usuario_id,
+        s.fecha_creacion,
+        s.fecha_expiracion,
+        u.nombre_completo,
+        u.correo,
+        u.identidad,
+        u.tipo_usuario,
+        u.numero_cuenta,
+        u.descuento_aplicable,
+        u.verificado,
+        u.fuente_verificacion,
+        u.registro_cue_reg,
+        u.registro_cue_cod,
+        u.registro_tuvo_plan,
+        u.registro_plan_activo,
+        u.workcloud_emp_cod,
+        u.workcloud_contrato_cod,
+        u.estado
+      LIMIT 1
+    `,
+    [token]
+  );
+
+  return rows[0] || null;
+};
+
+export const eliminarRegistroSesionPorToken = async (token) => {
+  const [result] = await pool.execute(
+    `
+      DELETE FROM registro_sesiones
+      WHERE token = ?
+    `,
+    [token]
+  );
+
+  return result.affectedRows;
+};
+
 export const obtenerAlumnoRegistroPorNumeroCuenta = async (numeroCuenta) => {
   const [rows] = await pool.execute(
     `
